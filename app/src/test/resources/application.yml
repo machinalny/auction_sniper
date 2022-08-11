@@ -1,0 +1,7 @@
+test:
+  auction1: item-54321
+
+spring:
+  kafka:
+    template:
+      default-topic: auction-notifications
