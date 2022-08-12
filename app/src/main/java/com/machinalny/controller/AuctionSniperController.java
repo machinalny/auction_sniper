@@ -1,5 +1,7 @@
 package com.machinalny.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.machinalny.model.AuctionState;
 import com.machinalny.service.AuctionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,14 +18,14 @@ public class AuctionSniperController {
     }
 
     @GetMapping("/{itemIdentificator}")
-    public ResponseEntity<String> getAuctionStatusByItemIdentificator(@PathVariable("itemIdentificator") String itemIdentificator) throws InterruptedException {
+    public ResponseEntity<AuctionState> getAuctionStatusByItemIdentificator(@PathVariable("itemIdentificator") String itemIdentificator) throws InterruptedException {
 
         return ResponseEntity.ok(auctionService.getAuctionStatusBy(itemIdentificator));
 
     }
 
     @PostMapping("/")
-    public void startAuctionOn(@RequestBody String itemIdentifiactor) {
+    public void startAuctionOn(@RequestBody String itemIdentifiactor) throws JsonProcessingException {
         auctionService.startBiddingIn(itemIdentifiactor);
     }
 }

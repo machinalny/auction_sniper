@@ -3,3 +3,6 @@ spring:
     bootstrap-servers: localhost:9092
     template:
       default-topic: auction-notifications
+
+auction-sniper:
+  auction-topic: auction-notifications

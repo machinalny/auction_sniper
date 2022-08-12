@@ -1,7 +1,11 @@
+auction-sniper:
+  auction-topic: auction-notifications
+
 test:
   auction1: item-54321
 
 spring:
   kafka:
+    bootstrap-servers: localhost:9092
     template:
       default-topic: auction-notifications

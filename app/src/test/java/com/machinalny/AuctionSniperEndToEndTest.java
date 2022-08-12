@@ -14,9 +14,12 @@ import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.time.Duration;
+
+import static org.awaitility.Awaitility.await;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @DirtiesContext
@@ -42,9 +45,11 @@ class AuctionSniperEndToEndTest {
         auctionService.startBiddingIn(auctionTopic1);
         auctionServer.hasReceivedJoinRequestFromSniper();
         auctionServer.announceClosed();
-        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic1))
-                .andExpect(status().is2xxSuccessful())
-                        .andExpect(content().string("LOST"));
+        await().atMost(Duration.ofSeconds(20))
+                .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
+                        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic1))
+                                .andExpect(status().is2xxSuccessful())
+                                .andExpect(jsonPath("$.state").value("LOST")));
     }
 
 }

@@ -1,43 +1,39 @@
 package com.machinalny.service;
 
-import com.machinalny.kafka.AuctionKafkaConsumer;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.machinalny.kafka.AuctionKafkaProducer;
+import com.machinalny.model.AuctionRecord;
+import com.machinalny.model.AuctionState;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class AuctionService {
 
     private final AuctionKafkaProducer auctionKafkaProducer;
+    private final Map<String, AuctionState> currentAuctions;
 
-    private final AuctionKafkaConsumer auctionKafkaConsumer;
-
-    private final List<String> currentAuctions;
-
-    public AuctionService(AuctionKafkaProducer auctionKafkaProducer, AuctionKafkaConsumer auctionKafkaConsumer) {
+    public AuctionService(AuctionKafkaProducer auctionKafkaProducer) {
         this.auctionKafkaProducer = auctionKafkaProducer;
-        this.auctionKafkaConsumer = auctionKafkaConsumer;
-        this.currentAuctions = new ArrayList<>();
+        this.currentAuctions = new HashMap<>();
     }
 
-    public void startBiddingIn(String topic) {
-        auctionKafkaProducer.send(topic, "JOIN");
-        currentAuctions.add(topic);
+    public void startBiddingIn(String itemIdentification) throws JsonProcessingException {
+        auctionKafkaProducer.send(AuctionRecord.builder()
+                .auctioneer(this.toString())
+                .messageType("JOIN")
+                .itemIdentification(itemIdentification)
+                .build());
+        currentAuctions.put(itemIdentification, AuctionState.builder().state("WAITING_TO_JOIN").build());
     }
 
-    public String getAuctionStatusBy(String itemIdentificator) throws InterruptedException {
-        if (currentAuctions.contains(itemIdentificator)) {
-            boolean message = auctionKafkaConsumer.getLatch().await(10, TimeUnit.SECONDS);
-            if (message) {
-                String payload = auctionKafkaConsumer.getPayload();
-                return payload.contains("LOST") && currentAuctions.stream().anyMatch(payload::contains) ? "LOST": "";
-            }
-            return "";
-        } else {
-            return "NOT_BIDDING";
-        }
+    public void updateAuction(AuctionRecord auctionRecord) {
+        currentAuctions.get(auctionRecord.getItemIdentification()).setState(auctionRecord.getMessageType());
+    }
+
+    public AuctionState getAuctionStatusBy(String itemIdentificator) {
+        return currentAuctions.get(itemIdentificator);
     }
 }

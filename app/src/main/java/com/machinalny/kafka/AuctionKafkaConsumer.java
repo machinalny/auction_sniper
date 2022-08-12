@@ -1,31 +1,32 @@
 package com.machinalny.kafka;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.machinalny.model.AuctionRecord;
+import com.machinalny.service.AuctionService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.CountDownLatch;
-
 @Component
+@Slf4j
 public class AuctionKafkaConsumer {
-    private CountDownLatch latch = new CountDownLatch(1);
-    private String payload;
 
-    @KafkaListener(topics="auction-notifications", groupId = "auctionSniper")
-    public void receive(ConsumerRecord<?, ?> consumerRecord) {
-        payload = consumerRecord.toString();
-        latch.countDown();
+    private final ObjectMapper objectMapper;
+
+    private final AuctionService auctionService;
+
+    public AuctionKafkaConsumer(ObjectMapper objectMapper, AuctionService auctionService) {
+        this.objectMapper = objectMapper;
+        this.auctionService = auctionService;
     }
 
-    public void resetLatch() {
-        latch = new CountDownLatch(1);
+    @KafkaListener(topics = "${auction-sniper.auction-topic}", groupId = "auctionSniper")
+    public void receive(ConsumerRecord<String, String> consumerRecord) throws JsonProcessingException {
+        log.info(consumerRecord.toString());
+        AuctionRecord auctionRecord = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
+        this.auctionService.updateAuction(auctionRecord);
     }
 
-    public CountDownLatch getLatch() {
-        return latch;
-    }
-
-    public String getPayload() {
-        return payload;
-    }
 }
