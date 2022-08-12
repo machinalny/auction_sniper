@@ -10,30 +10,34 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class AuctionService {
-    
+
     private final AuctionKafkaProducer auctionKafkaProducer;
 
     private final AuctionKafkaConsumer auctionKafkaConsumer;
 
-    private final List<String> currentActions;
+    private final List<String> currentAuctions;
 
     public AuctionService(AuctionKafkaProducer auctionKafkaProducer, AuctionKafkaConsumer auctionKafkaConsumer) {
         this.auctionKafkaProducer = auctionKafkaProducer;
         this.auctionKafkaConsumer = auctionKafkaConsumer;
-        this.currentActions = new ArrayList<>();
+        this.currentAuctions = new ArrayList<>();
     }
 
     public void startBiddingIn(String topic) {
         auctionKafkaProducer.send(topic, "JOIN");
-        currentActions.add(topic);
+        currentAuctions.add(topic);
     }
 
-    public boolean sniperHasLostAuction() throws InterruptedException {
-        boolean message = auctionKafkaConsumer.getLatch().await(10, TimeUnit.SECONDS);
-        if (message){
-            String payload = auctionKafkaConsumer.getPayload();
-            return payload.contains("LOST") && currentActions.stream().anyMatch(payload::contains);
+    public String getAuctionStatusBy(String itemIdentificator) throws InterruptedException {
+        if (currentAuctions.contains(itemIdentificator)) {
+            boolean message = auctionKafkaConsumer.getLatch().await(10, TimeUnit.SECONDS);
+            if (message) {
+                String payload = auctionKafkaConsumer.getPayload();
+                return payload.contains("LOST") && currentAuctions.stream().anyMatch(payload::contains) ? "LOST": "";
+            }
+            return "";
+        } else {
+            return "NOT_BIDDING";
         }
-        return false;
     }
 }

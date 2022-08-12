@@ -8,17 +8,24 @@ import com.machinalny.service.AuctionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.web.servlet.MockMvc;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @DirtiesContext
+@AutoConfigureMockMvc
 @EmbeddedKafka(partitions = 1, brokerProperties = {"listeners=PLAINTEXT://localhost:9092", "port=9092"})
 class AuctionSniperEndToEndTest {
 
+    @Autowired
+    private MockMvc mockMvc;
     @Autowired
     private FakeAuctionConsumer auctionServer;
     @Autowired
@@ -30,10 +37,14 @@ class AuctionSniperEndToEndTest {
     @Test
     void sniperJoinsAuctionUntilAuctionClose() throws Exception {
         auctionServer.startSellingItem();
+        this.mockMvc.perform(post("/api/auction/sniper/")
+                .content(auctionTopic1));
         auctionService.startBiddingIn(auctionTopic1);
         auctionServer.hasReceivedJoinRequestFromSniper();
         auctionServer.announceClosed();
-        assertTrue(auctionService.sniperHasLostAuction());
+        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic1))
+                .andExpect(status().is2xxSuccessful())
+                        .andExpect(content().string("LOST"));
     }
 
 }
