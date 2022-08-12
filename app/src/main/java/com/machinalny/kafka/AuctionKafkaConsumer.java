@@ -11,7 +11,7 @@ public class AuctionKafkaConsumer {
     private CountDownLatch latch = new CountDownLatch(1);
     private String payload;
 
-    @KafkaListener(topics="auction-notifications", groupId = "auctionService")
+    @KafkaListener(topics="auction-notifications", groupId = "auctionSniper")
     public void receive(ConsumerRecord<?, ?> consumerRecord) {
         payload = consumerRecord.toString();
         latch.countDown();

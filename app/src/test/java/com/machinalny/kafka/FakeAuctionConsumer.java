@@ -31,6 +31,7 @@ public class FakeAuctionConsumer {
 
 
     public void startSellingItem() {
+        this.resetLatch();
     }
 
     public void hasReceivedJoinRequestFromSniper() throws InterruptedException {
@@ -38,11 +39,9 @@ public class FakeAuctionConsumer {
         if (!messageConsumed){
             throw new RuntimeException("Didn't got any message");
         }
-
-        kafkaTemplate.sendDefault("LOST" + "item-54321" );
-
     }
 
     public void announceClosed() {
+        kafkaTemplate.sendDefault("LOST" + "item-54321" );
     }
 }
