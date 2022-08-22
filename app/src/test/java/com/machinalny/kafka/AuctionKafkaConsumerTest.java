@@ -18,9 +18,6 @@ import static org.mockito.Mockito.verify;
 class AuctionKafkaConsumerTest {
 
     @MockBean
-    private AuctionKafkaProducer auctionKafkaProducer;
-
-    @MockBean
     private AuctionSniper auctionSniper;
 
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -37,9 +34,9 @@ class AuctionKafkaConsumerTest {
     }
 
     @Test
-    void reportsLostWhenAuctionCloses() throws JsonProcessingException {
+    void invokesActionOnAuctionNotification() throws JsonProcessingException {
         ConsumerRecord<String, String> auctionMessage =
-                new ConsumerRecord<>(auctionTopic, 0, 0l, "", """
+                new ConsumerRecord<>(auctionTopic, 0, 0l, "AUCTION", """
                         {
                         "bidder": "bidder"
                         }
