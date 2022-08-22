@@ -3,8 +3,7 @@
  */
 package com.machinalny;
 
-import com.machinalny.kafka.FakeAuctionConsumer;
-import com.machinalny.service.AuctionService;
+import com.machinalny.framework.FakeAuctionConsumer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;

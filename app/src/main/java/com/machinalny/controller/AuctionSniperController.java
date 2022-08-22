@@ -3,7 +3,7 @@ package com.machinalny.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.machinalny.model.AuctionState;
 import com.machinalny.model.Bidder;
-import com.machinalny.service.AuctionService;
+import com.machinalny.service.AuctionSniper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,21 +12,21 @@ import org.springframework.web.bind.annotation.*;
 @CrossOrigin(origins = "http://auction-sniper:8080")
 public class AuctionSniperController {
 
-    private final AuctionService auctionService;
+    private final AuctionSniper auctionSniper;
 
-    public AuctionSniperController(AuctionService auctionService) {
-        this.auctionService = auctionService;
+    public AuctionSniperController(AuctionSniper auctionSniper) {
+        this.auctionSniper = auctionSniper;
     }
 
     @GetMapping("/{itemIdentificator}")
     public ResponseEntity<AuctionState> getAuctionStatusByItemIdentificator(@PathVariable("itemIdentificator") String itemIdentificator)  {
 
-        return ResponseEntity.ok(auctionService.getAuctionStatusBy(itemIdentificator));
+        return ResponseEntity.ok(auctionSniper.getAuctionStatusBy(itemIdentificator));
 
     }
 
     @PostMapping("/")
     public void startAuctionOn(@RequestBody Bidder bidder) throws JsonProcessingException {
-        auctionService.startBiddingIn(bidder);
+        auctionSniper.startBiddingIn(bidder);
     }
 }

@@ -3,7 +3,7 @@ package com.machinalny.kafka;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.machinalny.model.AuctionRecord;
-import com.machinalny.service.AuctionService;
+import com.machinalny.service.AuctionSniper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -15,18 +15,18 @@ public class AuctionKafkaConsumer {
 
     private final ObjectMapper objectMapper;
 
-    private final AuctionService auctionService;
+    private final AuctionSniper auctionSniper;
 
-    public AuctionKafkaConsumer(ObjectMapper objectMapper, AuctionService auctionService) {
+    public AuctionKafkaConsumer(ObjectMapper objectMapper, AuctionSniper auctionSniper) {
         this.objectMapper = objectMapper;
-        this.auctionService = auctionService;
+        this.auctionSniper = auctionSniper;
     }
 
     @KafkaListener(topics = "${auction-sniper.auction-topic}", groupId = "auctionSniper")
     public void receive(ConsumerRecord<String, String> consumerRecord) throws JsonProcessingException {
         log.info(consumerRecord.toString());
         AuctionRecord auctionRecord = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
-        this.auctionService.updateAuction(auctionRecord);
+        this.auctionSniper.updateAuction(auctionRecord);
     }
 
 }

@@ -11,12 +11,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
-public class AuctionService {
+public class AuctionSniper {
 
     private final AuctionKafkaProducer auctionKafkaProducer;
     private final Map<String, AuctionState> currentAuctions;
 
-    public AuctionService(AuctionKafkaProducer auctionKafkaProducer) {
+    public AuctionSniper(AuctionKafkaProducer auctionKafkaProducer) {
         this.auctionKafkaProducer = auctionKafkaProducer;
         this.currentAuctions = new HashMap<>();
     }
