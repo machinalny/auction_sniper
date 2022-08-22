@@ -30,9 +30,6 @@ public class FakeAuctionConsumer {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Value("${test.auction1}")
-    private String auction;
-
     @Value("${auction-sniper.auction-topic}")
     private String auctionTopic;
 
@@ -43,10 +40,12 @@ public class FakeAuctionConsumer {
 
     @KafkaListener(topics = {"${auction-sniper.auction-topic}"}, groupId = "auctionService")
     public void receive(ConsumerRecord<String, String> consumerRecord) throws JsonProcessingException {
-        payload = consumerRecord.toString();
-        lastRecordReceived = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
-        log.info(payload);
-        latch.countDown();
+        if (consumerRecord.key().equals("BIDDER")) {
+            payload = consumerRecord.toString();
+            lastRecordReceived = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
+            log.info(payload);
+            latch.countDown();
+        }
     }
 
     public void resetLatch() {
@@ -63,6 +62,7 @@ public class FakeAuctionConsumer {
         if (!messageConsumed) {
             throw new RuntimeException("Didn't got any message");
         }
+        this.latch = new CountDownLatch(1);
         assertThat(lastRecordReceived, auctionRecordMatcher);
     }
 
@@ -70,16 +70,16 @@ public class FakeAuctionConsumer {
         receivesAMessageMatching(equalTo(AuctionRecord.builder().auction(auction).bidder(bidder).messageType("JOIN").build()));
     }
 
-    public void announceClosed() throws JsonProcessingException {
-        kafkaTemplate.send(auctionTopic, objectMapper.writeValueAsString(AuctionRecord.builder()
+    public void announceClosed(String auction) throws JsonProcessingException {
+        kafkaTemplate.send(auctionTopic, "AUCTION", objectMapper.writeValueAsString(AuctionRecord.builder()
                 .messageType("LOST")
                 .auction(auction)
                 .build()));
     }
 
-    public void reportPrice(int price, int increment, String bidder) throws JsonProcessingException {
-        kafkaTemplate.send(auctionTopic, objectMapper.writeValueAsString(AuctionRecord.builder()
-                .messageType("BID")
+    public void reportPrice(String auction, int price, int increment, String bidder) throws JsonProcessingException {
+        kafkaTemplate.send(auctionTopic, "AUCTION", objectMapper.writeValueAsString(AuctionRecord.builder()
+                .messageType("PRICE")
                 .price(price)
                 .increment(increment)
                 .bidder(bidder)

@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class Bidder {
+public class BidRequest {
     private String bidder;
     private String auction;
 }

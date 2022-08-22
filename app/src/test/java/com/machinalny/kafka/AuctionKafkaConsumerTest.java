@@ -4,14 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.machinalny.service.AuctionSniper;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -33,9 +30,14 @@ class AuctionKafkaConsumerTest {
     @Value("${auction-sniper.auction-topic}")
     private String auctionTopic;
 
+
+    @BeforeEach
+    void setUp() {
+        auctionKafkaConsumer = new AuctionKafkaConsumer(objectMapper, auctionSniper);
+    }
+
     @Test
     void reportsLostWhenAuctionCloses() throws JsonProcessingException {
-        auctionKafkaConsumer = new AuctionKafkaConsumer(objectMapper, auctionSniper);
         ConsumerRecord<String, String> auctionMessage =
                 new ConsumerRecord<>(auctionTopic, 0, 0l, "", """
                         {

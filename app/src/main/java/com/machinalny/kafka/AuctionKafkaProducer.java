@@ -22,7 +22,7 @@ public class AuctionKafkaProducer {
     }
 
     public void send(AuctionRecord payload) throws JsonProcessingException {
-        kafkaTemplate.send(auctionTopic, objectMapper.writeValueAsString(payload));
+        kafkaTemplate.send(auctionTopic, "BIDDER", objectMapper.writeValueAsString(payload));
     }
 
 }

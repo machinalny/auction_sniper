@@ -38,7 +38,7 @@ class AuctionSniperEndToEndTest {
     @Value("${test.auction2}")
     private String auctionTopic2;
 
-    private final String bidder = "AuctionSniper";
+    private final String bidRequest = "AuctionSniper";
 
     @Test
     void sniperJoinsAuctionUntilAuctionClose() throws Exception {
@@ -50,9 +50,9 @@ class AuctionSniperEndToEndTest {
                         "bidder": "%s",
                         "auction": "%s"
                         }
-                        """.formatted(bidder, auctionTopic1)));
-        auctionServer.hasReceivedJoinRequestFrom(auctionTopic1, bidder);
-        auctionServer.announceClosed();
+                        """.formatted(bidRequest, auctionTopic1)));
+        auctionServer.hasReceivedJoinRequestFrom(auctionTopic1, bidRequest);
+        auctionServer.announceClosed(auctionTopic1);
         await().atMost(Duration.ofSeconds(20))
                 .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
                         this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic1))
@@ -71,18 +71,18 @@ class AuctionSniperEndToEndTest {
                         "bidder": "%s",
                         "auction": "%s"
                         }
-                        """.formatted(bidder, auctionTopic2)));
-        auctionServer.hasReceivedJoinRequestFrom(auctionTopic2, bidder);
+                        """.formatted(bidRequest, auctionTopic2)));
+        auctionServer.hasReceivedJoinRequestFrom(auctionTopic2, bidRequest);
 
-        auctionServer.reportPrice(1000, 98, "other bidder");
+        auctionServer.reportPrice(auctionTopic2,1000, 98, "other bidRequest");
         await().atMost(Duration.ofSeconds(20))
                 .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
                         this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic2))
                                 .andExpect(status().is2xxSuccessful())
                                 .andExpect(jsonPath("$.state").value("BIDDING")));
 
-        auctionServer.hasReceivedBid(auctionTopic1, 1098, bidder);
-        auctionServer.announceClosed();
+        auctionServer.hasReceivedBid(auctionTopic2, 1098, bidRequest);
+        auctionServer.announceClosed(auctionTopic2);
         await().atMost(Duration.ofSeconds(20))
                 .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
                         this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic2))

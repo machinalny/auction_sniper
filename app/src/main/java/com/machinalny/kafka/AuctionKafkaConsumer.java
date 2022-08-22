@@ -25,8 +25,10 @@ public class AuctionKafkaConsumer {
     @KafkaListener(topics = "${auction-sniper.auction-topic}", groupId = "auctionSniper")
     public void receive(ConsumerRecord<String, String> consumerRecord) throws JsonProcessingException {
         log.info(consumerRecord.toString());
-        AuctionRecord auctionRecord = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
-        this.auctionSniper.updateAuction(auctionRecord);
+        if (consumerRecord.key().equals("AUCTION")) {
+            AuctionRecord auctionRecord = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
+            this.auctionSniper.updateAuction(auctionRecord);
+        }
     }
 
 }

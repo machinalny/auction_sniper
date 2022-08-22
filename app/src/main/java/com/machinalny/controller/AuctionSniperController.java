@@ -2,7 +2,7 @@ package com.machinalny.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.machinalny.model.AuctionState;
-import com.machinalny.model.Bidder;
+import com.machinalny.model.BidRequest;
 import com.machinalny.service.AuctionSniper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +26,7 @@ public class AuctionSniperController {
     }
 
     @PostMapping("/")
-    public void startAuctionOn(@RequestBody Bidder bidder) throws JsonProcessingException {
-        auctionSniper.startBiddingIn(bidder);
+    public void startAuctionOn(@RequestBody BidRequest bidRequest) throws JsonProcessingException {
+        auctionSniper.startBiddingIn(bidRequest);
     }
 }

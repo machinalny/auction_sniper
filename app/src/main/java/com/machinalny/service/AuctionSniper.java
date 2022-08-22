@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.machinalny.kafka.AuctionKafkaProducer;
 import com.machinalny.model.AuctionRecord;
 import com.machinalny.model.AuctionState;
-import com.machinalny.model.Bidder;
+import com.machinalny.model.BidRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -21,20 +21,34 @@ public class AuctionSniper {
         this.currentAuctions = new HashMap<>();
     }
 
-    public void startBiddingIn(Bidder bidder) throws JsonProcessingException {
+    public void startBiddingIn(BidRequest bidRequest) throws JsonProcessingException {
         auctionKafkaProducer.send(AuctionRecord.builder()
-                .bidder(bidder.getBidder())
+                .bidder(bidRequest.getBidder())
                 .messageType("JOIN")
-                .auction(bidder.getAuction())
+                .auction(bidRequest.getAuction())
                 .build());
-        currentAuctions.put(bidder.getAuction(), AuctionState.builder().bidder(bidder.getBidder()).state("WAITING_TO_JOIN").build());
+        currentAuctions.put(bidRequest.getAuction(), AuctionState.builder().bidder(bidRequest.getBidder()).state("WAITING_TO_JOIN").build());
     }
 
-    public void updateAuction(AuctionRecord auctionRecord) {
-        currentAuctions.get(auctionRecord.getAuction()).setState(auctionRecord.getMessageType());
+    public void updateAuction(AuctionRecord auctionRecord) throws JsonProcessingException {
+        if (currentAuctions.containsKey(auctionRecord.getAuction()) && auctionRecord.getMessageType().equals("PRICE")) {
+            this.bidOnAuction(currentAuctions.get(auctionRecord.getAuction()), auctionRecord);
+            currentAuctions.get(auctionRecord.getAuction()).setState("BIDDING");
+        } else {
+            currentAuctions.get(auctionRecord.getAuction()).setState(auctionRecord.getMessageType());
+        }
     }
 
-    public AuctionState getAuctionStatusBy(String itemIdentificator) {
-        return currentAuctions.get(itemIdentificator);
+    private void bidOnAuction(AuctionState auctionState, AuctionRecord auctionRecord) throws JsonProcessingException {
+        auctionKafkaProducer.send(AuctionRecord.builder()
+                        .auction(auctionRecord.getAuction())
+                        .bidder(auctionState.getBidder())
+                        .messageType("BID")
+                        .bid(auctionRecord.getPrice() + auctionRecord.getIncrement())
+                .build());
+    }
+
+    public AuctionState getAuctionStatusBy(String itemIdentification) {
+        return currentAuctions.get(itemIdentification);
     }
 }
