@@ -5,15 +5,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Data
 @Builder
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class AuctionRecord {
+public class Bidder {
     private String bidder;
-    private int price;
-    private int increment;
-    private int bid;
     private String auction;
-    private String messageType;
 }

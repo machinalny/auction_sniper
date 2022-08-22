@@ -12,9 +12,11 @@ plugins {
     id 'org.springframework.boot' version '2.7.2'
     id 'io.spring.dependency-management' version '1.0.12.RELEASE'
     id 'java'
+    id 'jacoco'
+    id "org.sonarqube" version "3.4.0.2513"
 }
 group = 'com.machinalny'
-version = '0.0.1-SNAPSHOT'
+version = '0.0.2-SNAPSHOT'
 sourceCompatibility = '17'
 
 
@@ -45,6 +47,15 @@ testing {
             // Use JUnit Jupiter test framework
             useJUnitJupiter('5.8.1')
         }
+    }
+}
+
+test.finalizedBy jacocoTestReport
+
+jacocoTestReport {
+    dependsOn test // tests are required to run before generating the report
+    reports {
+        xml.required = true
     }
 }
 

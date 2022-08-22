@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.machinalny.kafka.AuctionKafkaProducer;
 import com.machinalny.model.AuctionRecord;
 import com.machinalny.model.AuctionState;
+import com.machinalny.model.Bidder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -20,17 +21,17 @@ public class AuctionService {
         this.currentAuctions = new HashMap<>();
     }
 
-    public void startBiddingIn(String itemIdentification) throws JsonProcessingException {
+    public void startBiddingIn(Bidder bidder) throws JsonProcessingException {
         auctionKafkaProducer.send(AuctionRecord.builder()
-                .auctioneer(this.toString())
+                .bidder(bidder.getBidder())
                 .messageType("JOIN")
-                .itemIdentification(itemIdentification)
+                .auction(bidder.getAuction())
                 .build());
-        currentAuctions.put(itemIdentification, AuctionState.builder().state("WAITING_TO_JOIN").build());
+        currentAuctions.put(bidder.getAuction(), AuctionState.builder().bidder(bidder.getBidder()).state("WAITING_TO_JOIN").build());
     }
 
     public void updateAuction(AuctionRecord auctionRecord) {
-        currentAuctions.get(auctionRecord.getItemIdentification()).setState(auctionRecord.getMessageType());
+        currentAuctions.get(auctionRecord.getAuction()).setState(auctionRecord.getMessageType());
     }
 
     public AuctionState getAuctionStatusBy(String itemIdentificator) {

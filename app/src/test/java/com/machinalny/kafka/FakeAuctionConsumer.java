@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.machinalny.model.AuctionRecord;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.hamcrest.Matcher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -13,6 +14,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
 
 @Component
 @Slf4j
@@ -34,9 +38,13 @@ public class FakeAuctionConsumer {
 
     private String payload;
 
+    private AuctionRecord lastRecordReceived;
+
+
     @KafkaListener(topics = {"${auction-sniper.auction-topic}"}, groupId = "auctionService")
-    public void receive(ConsumerRecord<?, ?> consumerRecord) {
+    public void receive(ConsumerRecord<String, String> consumerRecord) throws JsonProcessingException {
         payload = consumerRecord.toString();
+        lastRecordReceived = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
         log.info(payload);
         latch.countDown();
     }
@@ -50,17 +58,36 @@ public class FakeAuctionConsumer {
         this.resetLatch();
     }
 
-    public void hasReceivedJoinRequestFromSniper() throws InterruptedException {
+    private void receivesAMessageMatching(Matcher<? super AuctionRecord> auctionRecordMatcher) throws InterruptedException {
         boolean messageConsumed = this.latch.await(20, TimeUnit.SECONDS);
         if (!messageConsumed) {
             throw new RuntimeException("Didn't got any message");
         }
+        assertThat(lastRecordReceived, auctionRecordMatcher);
+    }
+
+    public void hasReceivedJoinRequestFrom(String auction, String bidder) throws InterruptedException {
+        receivesAMessageMatching(equalTo(AuctionRecord.builder().auction(auction).bidder(bidder).messageType("JOIN").build()));
     }
 
     public void announceClosed() throws JsonProcessingException {
         kafkaTemplate.send(auctionTopic, objectMapper.writeValueAsString(AuctionRecord.builder()
                 .messageType("LOST")
-                .itemIdentification(auction)
+                .auction(auction)
                 .build()));
+    }
+
+    public void reportPrice(int price, int increment, String bidder) throws JsonProcessingException {
+        kafkaTemplate.send(auctionTopic, objectMapper.writeValueAsString(AuctionRecord.builder()
+                .messageType("BID")
+                .price(price)
+                .increment(increment)
+                .bidder(bidder)
+                .auction(auction)
+                .build()));
+    }
+
+    public void hasReceivedBid(String auction, int bid, String fromBidder) throws InterruptedException {
+        receivesAMessageMatching(equalTo(AuctionRecord.builder().auction(auction).bidder(fromBidder).bid(bid).messageType("BID").build()));
     }
 }

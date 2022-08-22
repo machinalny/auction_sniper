@@ -19,7 +19,8 @@ import java.time.Duration;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @DirtiesContext
@@ -31,25 +32,65 @@ class AuctionSniperEndToEndTest {
     private MockMvc mockMvc;
     @Autowired
     private FakeAuctionConsumer auctionServer;
-    @Autowired
-    private AuctionService auctionService;
 
     @Value("${test.auction1}")
     private String auctionTopic1;
+
+    @Value("${test.auction2}")
+    private String auctionTopic2;
+
+    private final String bidder = "AuctionSniper";
 
     @Test
     void sniperJoinsAuctionUntilAuctionClose() throws Exception {
         auctionServer.startSellingItem();
         this.mockMvc.perform(post("/api/auction/sniper/")
-                .content(auctionTopic1));
-        auctionService.startBiddingIn(auctionTopic1);
-        auctionServer.hasReceivedJoinRequestFromSniper();
+                .contentType("application/json")
+                .content("""
+                        {
+                        "bidder": "%s",
+                        "auction": "%s"
+                        }
+                        """.formatted(bidder, auctionTopic1)));
+        auctionServer.hasReceivedJoinRequestFrom(auctionTopic1, bidder);
         auctionServer.announceClosed();
         await().atMost(Duration.ofSeconds(20))
                 .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
                         this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic1))
                                 .andExpect(status().is2xxSuccessful())
                                 .andExpect(jsonPath("$.state").value("LOST")));
+    }
+
+    @Test
+    void sniperMakesAHigherBitButLoses() throws Exception {
+        auctionServer.startSellingItem();
+
+        this.mockMvc.perform(post("/api/auction/sniper/")
+                .contentType("application/json")
+                .content("""
+                        {
+                        "bidder": "%s",
+                        "auction": "%s"
+                        }
+                        """.formatted(bidder, auctionTopic2)));
+        auctionServer.hasReceivedJoinRequestFrom(auctionTopic2, bidder);
+
+        auctionServer.reportPrice(1000, 98, "other bidder");
+        await().atMost(Duration.ofSeconds(20))
+                .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
+                        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic2))
+                                .andExpect(status().is2xxSuccessful())
+                                .andExpect(jsonPath("$.state").value("BIDDING")));
+
+        auctionServer.hasReceivedBid(auctionTopic1, 1098, bidder);
+        auctionServer.announceClosed();
+        await().atMost(Duration.ofSeconds(20))
+                .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
+                        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic2))
+                                .andExpect(status().is2xxSuccessful())
+                                .andExpect(jsonPath("$.state").value("LOST")));
+
+
     }
 
 }
