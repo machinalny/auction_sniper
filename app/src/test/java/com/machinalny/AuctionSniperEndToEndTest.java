@@ -4,9 +4,9 @@
 package com.machinalny;
 
 import com.machinalny.framework.FakeAuctionConsumer;
+import com.machinalny.model.AuctionState;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.test.context.EmbeddedKafka;
@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Duration;
 
+import static com.machinalny.model.AuctionState.*;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -27,78 +28,88 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EmbeddedKafka(partitions = 1, brokerProperties = {"listeners=PLAINTEXT://localhost:9092", "port=9092"})
 class AuctionSniperEndToEndTest {
 
+    private final String bidder = "AuctionSniper";
     @Autowired
     private MockMvc mockMvc;
     @Autowired
     private FakeAuctionConsumer auctionServer;
 
-    @Value("${test.auction1}")
-    private String auctionTopic1;
-
-    @Value("${test.auction2}")
-    private String auctionTopic2;
-
-    @Value("${test.auction2}")
-    private String auctionTopic3;
-
-    private final String bidder = "AuctionSniper";
-
     @Test
     void sniperJoinsAuctionUntilAuctionClose() throws Exception {
+        String auction = "joinsAuction";
+
         auctionServer.startSellingItem();
-        this.mockMvc.perform(post("/api/auction/sniper/")
-                .contentType("application/json")
-                .content("""
-                        {
-                        "bidder": "%s",
-                        "auction": "%s"
-                        }
-                        """.formatted(bidder, auctionTopic1)));
-        auctionServer.hasReceivedJoinRequestFrom(auctionTopic1, bidder);
-        auctionServer.announceClosed(auctionTopic1);
-        await().atMost(Duration.ofSeconds(20))
-                .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
-                        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic1))
-                                .andExpect(status().is2xxSuccessful())
-                                .andExpect(jsonPath("$.state").value("LOST")));
+
+        this.startBiddingOnAuctionWithBidder(auction, bidder);
+        auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
+
+        auctionServer.announceClosed(auction);
+        this.verifySateOfAuction(LOST, auction);
     }
 
     @Test
     void sniperMakesAHigherBitButLoses() throws Exception {
+        String auction = "losesAuctionByBiddingHigher";
+
         auctionServer.startSellingItem();
 
-        this.mockMvc.perform(post("/api/auction/sniper/")
-                .contentType("application/json")
-                .content("""
-                        {
-                        "bidder": "%s",
-                        "auction": "%s"
-                        }
-                        """.formatted(bidder, auctionTopic2)));
-        auctionServer.hasReceivedJoinRequestFrom(auctionTopic2, bidder);
+        this.startBiddingOnAuctionWithBidder(auction, bidder);
+        auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
 
-        auctionServer.reportPrice(auctionTopic2,1000, 98, "other bidRequest");
-        await().atMost(Duration.ofSeconds(20))
-                .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
-                        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic2))
-                                .andExpect(status().is2xxSuccessful())
-                                .andExpect(jsonPath("$.state").value("BIDDING")));
+        auctionServer.reportPrice(auction, 1000, 98, "other bidRequest");
+        this.verifySateOfAuction(BIDDING, auction);
+        auctionServer.hasReceivedBid(auction, 1098, bidder);
 
-        auctionServer.hasReceivedBid(auctionTopic2, 1098, bidder);
-        auctionServer.announceClosed(auctionTopic2);
-        await().atMost(Duration.ofSeconds(20))
-                .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
-                        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic2))
-                                .andExpect(status().is2xxSuccessful())
-                                .andExpect(jsonPath("$.state").value("LOST")));
-
-
+        auctionServer.announceClosed(auction);
+        this.verifySateOfAuction(LOST, auction);
     }
 
     @Test
     void sniperWinsAnAuctionByBiddingHigher() throws Exception {
+        String auction = "wonAuctionByBiddingHigher";
+
         auctionServer.startSellingItem();
 
+        this.startBiddingOnAuctionWithBidder(auction, bidder);
+        auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
+
+        auctionServer.reportPrice(auction, 1000, 98, "other bidRequest");
+        this.verifySateOfAuction(BIDDING, auction);
+        auctionServer.hasReceivedBid(auction, 1098, bidder);
+
+        auctionServer.reportPrice(auction, 1098, 97, bidder);
+        this.verifySateOfAuction(WINNING, auction);
+
+        auctionServer.announceClosed(auction);
+        this.verifySateOfAuction(WON, auction);
+    }
+
+
+    @Test
+    void sniperLosesAnAuctionWhenOtherBidsHigher() throws Exception {
+        String auction = "lostAuctionWhenOutBiden";
+        String otherBidder = "OtherBidder";
+
+        auctionServer.startSellingItem();
+
+        this.startBiddingOnAuctionWithBidder(auction, bidder);
+        auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
+
+        auctionServer.reportPrice(auction, 1000, 98, otherBidder);
+        this.verifySateOfAuction(BIDDING, auction);
+        auctionServer.hasReceivedBid(auction, 1098, bidder);
+
+        auctionServer.reportPrice(auction, 1098, 97, bidder);
+        this.verifySateOfAuction(WINNING, auction);
+
+        auctionServer.reportPrice(auction, 1195, 96, otherBidder);
+
+        auctionServer.announceClosed(auction);
+        this.verifySateOfAuction(LOST, auction);
+    }
+
+
+    public void startBiddingOnAuctionWithBidder(String auction, String bidder) throws Exception {
         this.mockMvc.perform(post("/api/auction/sniper/")
                 .contentType("application/json")
                 .content("""
@@ -106,33 +117,15 @@ class AuctionSniperEndToEndTest {
                         "bidder": "%s",
                         "auction": "%s"
                         }
-                        """.formatted(bidder, auctionTopic3)));
-        auctionServer.hasReceivedJoinRequestFrom(auctionTopic3, bidder);
+                        """.formatted(bidder, auction)));
+    }
 
-        auctionServer.reportPrice(auctionTopic2,1000, 98, "other bidRequest");
+    public void verifySateOfAuction(AuctionState expectedState, String auction) {
         await().atMost(Duration.ofSeconds(20))
                 .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
-                        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic3))
+                        this.mockMvc.perform(get("/api/auction/sniper/" + auction))
                                 .andExpect(status().is2xxSuccessful())
-                                .andExpect(jsonPath("$.state").value("BIDDING")));
-
-        auctionServer.hasReceivedBid(auctionTopic3, 1098, bidder);
-        auctionServer.reportPrice(auctionTopic3,1098, 97, bidder);
-
-        await().atMost(Duration.ofSeconds(20))
-                .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
-                        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic3))
-                                .andExpect(status().is2xxSuccessful())
-                                .andExpect(jsonPath("$.state").value("WINNING")));
-
-        auctionServer.announceClosed(auctionTopic3);
-        await().atMost(Duration.ofSeconds(20))
-                .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
-                        this.mockMvc.perform(get("/api/auction/sniper/" + auctionTopic2))
-                                .andExpect(status().is2xxSuccessful())
-                                .andExpect(jsonPath("$.state").value("WON")));
-
-
+                                .andExpect(jsonPath("$.state").value(expectedState.toString())));
     }
 
 }

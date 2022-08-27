@@ -33,8 +33,6 @@ class AuctionSniperTest {
         String auction = "Auction";
         String bidder = "Bidder";
         String otherBidder = "OtherBidder";
-        BidRequest bidRequest = BidRequest.builder()
-                .auction(auction).bidder(bidder).build();
 
         AuctionRecord bidRecord = AuctionRecord.builder()
                 .bid(price + increment)
@@ -43,17 +41,9 @@ class AuctionSniperTest {
                 .messageType(AuctionMessageType.BID)
                 .build();
 
-        auctionSniper.startBiddingIn(bidRequest);
+        this.joinAuction(auction, bidder);
 
-        AuctionRecord auctionRecord = AuctionRecord.builder()
-                .auction(auction)
-                .price(price)
-                .increment(increment)
-                .bidder(otherBidder)
-                .messageType(AuctionMessageType.PRICE)
-                .build();
-
-        auctionSniper.updateAuction(auctionRecord);
+        this.updateAuctionWith(auction, price, increment, otherBidder, AuctionMessageType.PRICE);
 
         verify(auctionKafkaProducer).send(bidRecord);
     }
@@ -72,20 +62,9 @@ class AuctionSniperTest {
                 .price(price)
                 .build();
 
-        BidRequest bidRequest = BidRequest.builder()
-                .auction(auction).bidder(bidder).build();
+        this.joinAuction(auction, bidder);
 
-        auctionSniper.startBiddingIn(bidRequest);
-
-        AuctionRecord auctionRecord = AuctionRecord.builder()
-                .auction(auction)
-                .price(price)
-                .increment(increment)
-                .bidder(bidder)
-                .messageType(AuctionMessageType.PRICE).build();
-
-        auctionSniper
-                .updateAuction(auctionRecord);
+        this.updateAuctionWith(auction, price, increment, bidder, AuctionMessageType.PRICE);
 
         assertThat(auctionSniper.getAuctionStatusBy(auction), equalTo(expectedAuctionReport));
 
@@ -101,17 +80,9 @@ class AuctionSniperTest {
                 .bidder(bidder)
                 .build();
 
-        BidRequest bidRequest = BidRequest.builder()
-                .auction(auction).bidder(bidder).build();
+        this.joinAuction(auction, bidder);
 
-        auctionSniper.startBiddingIn(bidRequest);
-
-        AuctionRecord auctionRecord = AuctionRecord.builder()
-                .auction(auction)
-                .messageType(AuctionMessageType.CLOSED).build();
-
-        auctionSniper
-                .updateAuction(auctionRecord);
+        this.updateAuctionWith(auction, AuctionMessageType.CLOSED);
 
         assertThat(auctionSniper.getAuctionStatusBy(auction), equalTo(expectedAuctionReport));
     }
@@ -123,8 +94,6 @@ class AuctionSniperTest {
         String auction = "Auction";
         String bidder = "Bidder";
         String otherBidder = "OtherBidder";
-        BidRequest bidRequest = BidRequest.builder()
-                .auction(auction).bidder(bidder).build();
 
         AuctionReport expectedAuctionReport = AuctionReport.builder()
                 .state(AuctionState.LOST)
@@ -132,24 +101,11 @@ class AuctionSniperTest {
                 .bidder(bidder)
                 .build();
 
-        AuctionRecord priceRecord = AuctionRecord.builder()
-                .auction(auction)
-                .price(price)
-                .increment(increment)
-                .bidder(otherBidder)
-                .messageType(AuctionMessageType.PRICE)
-                .build();
+        this.joinAuction(auction, bidder);
 
-        auctionSniper.startBiddingIn(bidRequest);
+        this.updateAuctionWith(auction, price, increment, otherBidder, AuctionMessageType.PRICE);
 
-        auctionSniper.updateAuction(priceRecord);
-
-        AuctionRecord auctionRecord = AuctionRecord.builder()
-                .auction(auction)
-                .messageType(AuctionMessageType.CLOSED)
-                .build();
-
-        auctionSniper.updateAuction(auctionRecord);
+        this.updateAuctionWith(auction, AuctionMessageType.CLOSED);
 
         assertThat(auctionSniper.getAuctionStatusBy(auction), equalTo(expectedAuctionReport));
     }
@@ -161,8 +117,6 @@ class AuctionSniperTest {
         String auction = "Auction";
         String bidder = "Bidder";
         String otherBidder = "OtherBidder";
-        BidRequest bidRequest = BidRequest.builder()
-                .auction(auction).bidder(bidder).build();
 
         AuctionReport expectedAuctionReport = AuctionReport.builder()
                 .state(AuctionState.WON)
@@ -170,36 +124,68 @@ class AuctionSniperTest {
                 .bidder(bidder)
                 .build();
 
-        AuctionRecord priceRecord = AuctionRecord.builder()
-                .auction(auction)
+        this.joinAuction(auction, bidder);
+
+        this.updateAuctionWith(auction, price, increment, otherBidder, AuctionMessageType.PRICE);
+
+        this.updateAuctionWith(auction, price, increment, bidder, AuctionMessageType.PRICE);
+
+        this.updateAuctionWith(auction, AuctionMessageType.CLOSED);
+
+        assertThat(auctionSniper.getAuctionStatusBy(auction), equalTo(expectedAuctionReport));
+    }
+
+    @Test
+    void biddingIfWasWinningWhenHigherBidComes() throws JsonProcessingException {
+        final int price = 1001;
+        final int increment = 25;
+        String auction = "Auction";
+        String bidder = "Bidder";
+        String otherBidder = "OtherBidder";
+
+        AuctionReport expectedAuctionReport = AuctionReport.builder()
+                .state(AuctionState.BIDDING)
                 .price(price)
-                .increment(increment)
-                .bidder(otherBidder)
-                .messageType(AuctionMessageType.PRICE)
+                .bidder(bidder)
                 .build();
+
+        this.joinAuction(auction, bidder);
+
+        this.updateAuctionWith(auction, price, increment, bidder, AuctionMessageType.PRICE);
+
+        this.updateAuctionWith(auction, price, increment, otherBidder, AuctionMessageType.PRICE);
+
+        assertThat(auctionSniper.getAuctionStatusBy(auction), equalTo(expectedAuctionReport));
+
+    }
+
+    private void joinAuction(String auction, String bidder) throws JsonProcessingException {
+        BidRequest bidRequest = BidRequest.builder()
+                .auction(auction).bidder(bidder).build();
 
         auctionSniper.startBiddingIn(bidRequest);
 
-        auctionSniper.updateAuction(priceRecord);
+    }
 
-        AuctionRecord priceRecord2 = AuctionRecord.builder()
+    private void updateAuctionWith(String auction, AuctionMessageType messageType){
+        AuctionRecord auctionRecord = AuctionRecord.builder()
+                .auction(auction)
+                .messageType(messageType)
+                .build();
+
+        auctionSniper.updateAuction(auctionRecord);
+    }
+
+
+    private void updateAuctionWith(String auction, int price, int increment, String bidder, AuctionMessageType messageType){
+        AuctionRecord auctionRecord = AuctionRecord.builder()
                 .auction(auction)
                 .price(price)
                 .increment(increment)
                 .bidder(bidder)
-                .messageType(AuctionMessageType.PRICE)
-                .build();
-
-        auctionSniper.updateAuction(priceRecord2);
-
-
-        AuctionRecord auctionRecord = AuctionRecord.builder()
-                .auction(auction)
-                .messageType(AuctionMessageType.CLOSED)
+                .messageType(messageType)
                 .build();
 
         auctionSniper.updateAuction(auctionRecord);
-
-        assertThat(auctionSniper.getAuctionStatusBy(auction), equalTo(expectedAuctionReport));
     }
 }
