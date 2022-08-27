@@ -23,11 +23,13 @@ public class AuctionKafkaConsumer {
     }
 
     @KafkaListener(topics = "${auction-sniper.auction-topic}", groupId = "auctionSniper")
-    public void receive(ConsumerRecord<String, String> consumerRecord) throws JsonProcessingException {
+    public void receive(ConsumerRecord<String, String> consumerRecord) {
         log.info(consumerRecord.toString());
-        if (consumerRecord.key().equals("AUCTION")) {
+        try {
             AuctionRecord auctionRecord = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
-            this.auctionSniper.updateAuction(auctionRecord);
+            this.auctionSniper.updateAuction(consumerRecord.key(), auctionRecord);
+        } catch (JsonProcessingException e) {
+            log.warn("Received message that didn't match ActionRecord {}, {}", consumerRecord.key(), consumerRecord.value());
         }
     }
 

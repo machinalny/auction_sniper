@@ -36,7 +36,6 @@ class AuctionSniperTest {
 
         AuctionRecord bidRecord = AuctionRecord.builder()
                 .bid(price + increment)
-                .auction(auction)
                 .bidder(bidder)
                 .messageType(AuctionMessageType.BID)
                 .build();
@@ -45,7 +44,7 @@ class AuctionSniperTest {
 
         this.updateAuctionWith(auction, price, increment, otherBidder, AuctionMessageType.PRICE);
 
-        verify(auctionKafkaProducer).send(bidRecord);
+        verify(auctionKafkaProducer).send(auction, bidRecord);
     }
 
 
@@ -169,23 +168,21 @@ class AuctionSniperTest {
 
     private void updateAuctionWith(String auction, AuctionMessageType messageType){
         AuctionRecord auctionRecord = AuctionRecord.builder()
-                .auction(auction)
                 .messageType(messageType)
                 .build();
 
-        auctionSniper.updateAuction(auctionRecord);
+        auctionSniper.updateAuction(auction, auctionRecord);
     }
 
 
     private void updateAuctionWith(String auction, int price, int increment, String bidder, AuctionMessageType messageType){
         AuctionRecord auctionRecord = AuctionRecord.builder()
-                .auction(auction)
                 .price(price)
                 .increment(increment)
                 .bidder(bidder)
                 .messageType(messageType)
                 .build();
 
-        auctionSniper.updateAuction(auctionRecord);
+        auctionSniper.updateAuction(auction, auctionRecord);
     }
 }

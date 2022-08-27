@@ -38,7 +38,7 @@ class AuctionSniperEndToEndTest {
     void sniperJoinsAuctionUntilAuctionClose() throws Exception {
         String auction = "joinsAuction";
 
-        auctionServer.startSellingItem();
+        auctionServer.startSellingItem(auction);
 
         this.startBiddingOnAuctionWithBidder(auction, bidder);
         auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
@@ -51,7 +51,7 @@ class AuctionSniperEndToEndTest {
     void sniperMakesAHigherBitButLoses() throws Exception {
         String auction = "losesAuctionByBiddingHigher";
 
-        auctionServer.startSellingItem();
+        auctionServer.startSellingItem(auction);
 
         this.startBiddingOnAuctionWithBidder(auction, bidder);
         auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
@@ -68,7 +68,7 @@ class AuctionSniperEndToEndTest {
     void sniperWinsAnAuctionByBiddingHigher() throws Exception {
         String auction = "wonAuctionByBiddingHigher";
 
-        auctionServer.startSellingItem();
+        auctionServer.startSellingItem(auction);
 
         this.startBiddingOnAuctionWithBidder(auction, bidder);
         auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
@@ -90,7 +90,7 @@ class AuctionSniperEndToEndTest {
         String auction = "lostAuctionWhenOutBiden";
         String otherBidder = "OtherBidder";
 
-        auctionServer.startSellingItem();
+        auctionServer.startSellingItem(auction);
 
         this.startBiddingOnAuctionWithBidder(auction, bidder);
         auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
@@ -108,6 +108,10 @@ class AuctionSniperEndToEndTest {
         this.verifySateOfAuction(LOST, auction);
     }
 
+    @Test
+    void sniperBidsForMultipleItems(){
+
+    }
 
     public void startBiddingOnAuctionWithBidder(String auction, String bidder) throws Exception {
         this.mockMvc.perform(post("/api/auction/sniper/")

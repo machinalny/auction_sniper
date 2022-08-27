@@ -34,7 +34,7 @@ class AuctionKafkaConsumerTest {
     }
 
     @Test
-    void invokesActionOnAuctionNotification() throws JsonProcessingException {
+    void invokesActionOnAuctionNotification() {
         ConsumerRecord<String, String> auctionMessage =
                 new ConsumerRecord<>(auctionTopic, 0, 0l, "AUCTION", """
                         {
@@ -43,6 +43,6 @@ class AuctionKafkaConsumerTest {
                         """);
         auctionKafkaConsumer.receive(auctionMessage);
 
-        verify(auctionSniper).updateAuction(any());
+        verify(auctionSniper).updateAuction(any(), any());
     }
 }

@@ -18,10 +18,10 @@ public class AuctionSniperController {
         this.auctionSniper = auctionSniper;
     }
 
-    @GetMapping("/{itemIdentificator}")
-    public ResponseEntity<AuctionReport> getAuctionStatusByItemIdentification(@PathVariable("itemIdentificator") String itemIdentificator)  {
+    @GetMapping("/{itemIdentification}")
+    public ResponseEntity<AuctionReport> getAuctionStatusByItemIdentification(@PathVariable("itemIdentification") String itemIdentification)  {
 
-        return ResponseEntity.ok(auctionSniper.getAuctionStatusBy(itemIdentificator));
+        return ResponseEntity.ok(auctionSniper.getAuctionStatusBy(itemIdentification));
 
     }
 

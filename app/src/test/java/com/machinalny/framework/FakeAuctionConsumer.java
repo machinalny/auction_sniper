@@ -13,6 +13,10 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -36,14 +40,16 @@ public class FakeAuctionConsumer {
 
     private String payload;
 
-    private AuctionRecord lastRecordReceived;
+    private Map<String, AuctionRecord> lastRecordReceivedForAuction = new HashMap<>();
+
+    private Set<String> auctions = new HashSet<>();
 
 
     @KafkaListener(topics = {"${auction-sniper.auction-topic}"}, groupId = "auctionService")
     public void receive(ConsumerRecord<String, String> consumerRecord) throws JsonProcessingException {
-        if (consumerRecord.key().equals("BIDDER")) {
+        if (this.auctions.contains(consumerRecord.key())) {
             payload = consumerRecord.toString();
-            lastRecordReceived = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
+            lastRecordReceivedForAuction.put(consumerRecord.key(), objectMapper.readValue(consumerRecord.value(), AuctionRecord.class));
             log.info(payload);
             latch.countDown();
         }
@@ -54,41 +60,50 @@ public class FakeAuctionConsumer {
     }
 
 
-    public void startSellingItem() {
+    public void startSellingItem(String auction) {
+        this.auctions.add(auction);
         this.resetLatch();
     }
 
-    private void receivesAMessageMatching(Matcher<? super AuctionRecord> auctionRecordMatcher) throws InterruptedException {
+    private void receivesAMessageForAuctionMatching(String auction, Matcher<? super AuctionRecord> auctionRecordMatcher) throws InterruptedException {
         boolean messageConsumed = this.latch.await(20, TimeUnit.SECONDS);
         if (!messageConsumed) {
             throw new RuntimeException("Didn't got any message");
         }
-        this.latch = new CountDownLatch(1);
-        assertThat(lastRecordReceived, auctionRecordMatcher);
+        this.resetLatch();
+        assertThat(lastRecordReceivedForAuction.getOrDefault(auction, AuctionRecord.builder().build()), auctionRecordMatcher);
     }
 
     public void hasReceivedJoinRequestFrom(String auction, String bidder) throws InterruptedException {
-        receivesAMessageMatching(equalTo(AuctionRecord.builder().auction(auction).bidder(bidder).messageType(AuctionMessageType.JOIN).build()));
+        receivesAMessageForAuctionMatching(auction,
+                equalTo(AuctionRecord.builder()
+                        .bidder(bidder)
+                        .messageType(AuctionMessageType.JOIN)
+                        .build()));
     }
 
     public void announceClosed(String auction) throws JsonProcessingException {
-        kafkaTemplate.send(auctionTopic, "AUCTION", objectMapper.writeValueAsString(AuctionRecord.builder()
+        kafkaTemplate.send(auctionTopic, auction, objectMapper.writeValueAsString(AuctionRecord.builder()
                 .messageType(AuctionMessageType.CLOSED)
-                .auction(auction)
                 .build()));
     }
 
     public void reportPrice(String auction, int price, int increment, String bidder) throws JsonProcessingException {
-        kafkaTemplate.send(auctionTopic, "AUCTION", objectMapper.writeValueAsString(AuctionRecord.builder()
+        kafkaTemplate.send(auctionTopic, auction, objectMapper.writeValueAsString(AuctionRecord.builder()
                 .messageType(AuctionMessageType.PRICE)
                 .price(price)
                 .increment(increment)
                 .bidder(bidder)
-                .auction(auction)
                 .build()));
     }
 
     public void hasReceivedBid(String auction, int bid, String fromBidder) throws InterruptedException {
-        receivesAMessageMatching(equalTo(AuctionRecord.builder().auction(auction).bidder(fromBidder).bid(bid).messageType(AuctionMessageType.BID).build()));
+        receivesAMessageForAuctionMatching(auction,
+                equalTo(AuctionRecord
+                        .builder()
+                        .bidder(fromBidder)
+                        .bid(bid)
+                        .messageType(AuctionMessageType.BID)
+                        .build()));
     }
 }
