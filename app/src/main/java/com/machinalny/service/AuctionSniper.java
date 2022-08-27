@@ -2,10 +2,7 @@ package com.machinalny.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.machinalny.kafka.AuctionKafkaProducer;
-import com.machinalny.model.AuctionRecord;
-import com.machinalny.model.AuctionReport;
-import com.machinalny.model.AuctionState;
-import com.machinalny.model.BidRequest;
+import com.machinalny.model.*;
 import lombok.SneakyThrows;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +23,7 @@ public class AuctionSniper {
     public void startBiddingIn(BidRequest bidRequest) throws JsonProcessingException {
         auctionKafkaProducer.send(AuctionRecord.builder()
                 .bidder(bidRequest.getBidder())
-                .messageType("JOIN")
+                .messageType(AuctionMessageType.JOIN)
                 .auction(bidRequest.getAuction())
                 .build());
         currentAuctions.put(bidRequest.getAuction(), AuctionReport.builder().bidder(bidRequest.getBidder()).state(AuctionState.WAITING_TO_JOIN).build());
@@ -36,8 +33,8 @@ public class AuctionSniper {
         AuctionReport auctionReport = currentAuctions.getOrDefault(auctionRecord.getAuction(), AuctionReport.NO_REPORT);
         if (!auctionReport.equals(AuctionReport.NO_REPORT))
             switch (auctionRecord.getMessageType()) {
-                case "PRICE" -> this.decideOnPriceMessage(auctionRecord, auctionReport);
-                case "CLOSED" -> currentAuctions.get(auctionRecord.getAuction()).setState(AuctionState.LOST);
+                case PRICE -> this.decideOnPriceMessage(auctionRecord, auctionReport);
+                case CLOSED -> this.closeAuction(auctionReport);
             }
 
     }
@@ -55,11 +52,20 @@ public class AuctionSniper {
 
     }
 
+    private void closeAuction(AuctionReport auctionReport){
+        if (auctionReport.getState().equals(AuctionState.WINNING)){
+            auctionReport.setState(AuctionState.WON);
+        } else {
+            auctionReport.setState(AuctionState.LOST);
+        }
+
+    }
+
     private void bidOnAuction(AuctionReport auctionReport, AuctionRecord auctionRecord) throws JsonProcessingException {
         auctionKafkaProducer.send(AuctionRecord.builder()
                 .auction(auctionRecord.getAuction())
                 .bidder(auctionReport.getBidder())
-                .messageType("BID")
+                .messageType(AuctionMessageType.BID)
                 .bid(auctionRecord.getPrice() + auctionRecord.getIncrement())
                 .build());
     }

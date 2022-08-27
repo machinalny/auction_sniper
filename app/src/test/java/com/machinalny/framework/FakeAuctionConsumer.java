@@ -2,6 +2,7 @@ package com.machinalny.framework;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.machinalny.model.AuctionMessageType;
 import com.machinalny.model.AuctionRecord;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -67,19 +68,19 @@ public class FakeAuctionConsumer {
     }
 
     public void hasReceivedJoinRequestFrom(String auction, String bidder) throws InterruptedException {
-        receivesAMessageMatching(equalTo(AuctionRecord.builder().auction(auction).bidder(bidder).messageType("JOIN").build()));
+        receivesAMessageMatching(equalTo(AuctionRecord.builder().auction(auction).bidder(bidder).messageType(AuctionMessageType.JOIN).build()));
     }
 
     public void announceClosed(String auction) throws JsonProcessingException {
         kafkaTemplate.send(auctionTopic, "AUCTION", objectMapper.writeValueAsString(AuctionRecord.builder()
-                .messageType("CLOSED")
+                .messageType(AuctionMessageType.CLOSED)
                 .auction(auction)
                 .build()));
     }
 
     public void reportPrice(String auction, int price, int increment, String bidder) throws JsonProcessingException {
         kafkaTemplate.send(auctionTopic, "AUCTION", objectMapper.writeValueAsString(AuctionRecord.builder()
-                .messageType("PRICE")
+                .messageType(AuctionMessageType.PRICE)
                 .price(price)
                 .increment(increment)
                 .bidder(bidder)
@@ -88,6 +89,6 @@ public class FakeAuctionConsumer {
     }
 
     public void hasReceivedBid(String auction, int bid, String fromBidder) throws InterruptedException {
-        receivesAMessageMatching(equalTo(AuctionRecord.builder().auction(auction).bidder(fromBidder).bid(bid).messageType("BID").build()));
+        receivesAMessageMatching(equalTo(AuctionRecord.builder().auction(auction).bidder(fromBidder).bid(bid).messageType(AuctionMessageType.BID).build()));
     }
 }

@@ -15,5 +15,5 @@ public class AuctionRecord {
     private int increment;
     private int bid;
     private String auction;
-    private String messageType;
+    private AuctionMessageType messageType;
 }
