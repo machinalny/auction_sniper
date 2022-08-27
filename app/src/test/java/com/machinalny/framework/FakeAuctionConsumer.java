@@ -72,7 +72,7 @@ public class FakeAuctionConsumer {
 
     public void announceClosed(String auction) throws JsonProcessingException {
         kafkaTemplate.send(auctionTopic, "AUCTION", objectMapper.writeValueAsString(AuctionRecord.builder()
-                .messageType("LOST")
+                .messageType("CLOSED")
                 .auction(auction)
                 .build()));
     }

@@ -4,6 +4,7 @@ auction-sniper:
 test:
   auction1: item-54321
   auction2: item-84910
+  auction3: item-123545
 
 spring:
   kafka:
