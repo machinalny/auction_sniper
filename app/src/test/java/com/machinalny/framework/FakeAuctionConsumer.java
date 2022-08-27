@@ -13,10 +13,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -38,20 +35,23 @@ public class FakeAuctionConsumer {
     @Value("${auction-sniper.auction-topic}")
     private String auctionTopic;
 
-    private String payload;
+    private final Map<String, AuctionRecord> lastRecordReceivedForAuction = new HashMap<>();
 
-    private Map<String, AuctionRecord> lastRecordReceivedForAuction = new HashMap<>();
+    private final Set<String> auctions = new HashSet<>();
 
-    private Set<String> auctions = new HashSet<>();
+    private final List<AuctionMessageType> biddersMessageTypes = List.of(AuctionMessageType.BID, AuctionMessageType.JOIN);
 
 
     @KafkaListener(topics = {"${auction-sniper.auction-topic}"}, groupId = "auctionService")
     public void receive(ConsumerRecord<String, String> consumerRecord) throws JsonProcessingException {
         if (this.auctions.contains(consumerRecord.key())) {
-            payload = consumerRecord.toString();
-            lastRecordReceivedForAuction.put(consumerRecord.key(), objectMapper.readValue(consumerRecord.value(), AuctionRecord.class));
+            String payload = consumerRecord.toString();
+            AuctionRecord auctionRecord = objectMapper.readValue(consumerRecord.value(), AuctionRecord.class);
+            if (biddersMessageTypes.contains(auctionRecord.getMessageType())) {
+                lastRecordReceivedForAuction.put(consumerRecord.key(), objectMapper.readValue(consumerRecord.value(), AuctionRecord.class));
+                latch.countDown();
+            }
             log.info(payload);
-            latch.countDown();
         }
     }
 
@@ -70,8 +70,8 @@ public class FakeAuctionConsumer {
         if (!messageConsumed) {
             throw new RuntimeException("Didn't got any message");
         }
-        this.resetLatch();
         assertThat(lastRecordReceivedForAuction.getOrDefault(auction, AuctionRecord.builder().build()), auctionRecordMatcher);
+        this.resetLatch();
     }
 
     public void hasReceivedJoinRequestFrom(String auction, String bidder) throws InterruptedException {

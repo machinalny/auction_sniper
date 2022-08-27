@@ -14,6 +14,8 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.machinalny.model.AuctionState.*;
 import static org.awaitility.Awaitility.await;
@@ -96,7 +98,6 @@ class AuctionSniperEndToEndTest {
         auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
 
         auctionServer.reportPrice(auction, 1000, 98, otherBidder);
-        this.verifySateOfAuction(BIDDING, auction);
         auctionServer.hasReceivedBid(auction, 1098, bidder);
 
         auctionServer.reportPrice(auction, 1098, 97, bidder);
@@ -109,8 +110,33 @@ class AuctionSniperEndToEndTest {
     }
 
     @Test
-    void sniperBidsForMultipleItems(){
+    void sniperBidsForMultipleItems() throws Exception {
+        String auction = "won1AuctionByBiddingHigher";
+        String auction2 = "won2AuctionByBiddingHigher";
 
+        auctionServer.startSellingItem(auction);
+        auctionServer.startSellingItem(auction2);
+
+        this.startBiddingOnAuctionsWithBidder(List.of(auction, auction2), bidder);
+        auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
+        auctionServer.hasReceivedJoinRequestFrom(auction2, bidder);
+
+        auctionServer.reportPrice(auction, 1000, 98, "other bidRequest");
+        auctionServer.hasReceivedBid(auction, 1098, bidder);
+
+        auctionServer.reportPrice(auction2, 500, 21, "other bidRequest");
+        auctionServer.hasReceivedBid(auction2, 521, bidder);
+
+        auctionServer.reportPrice(auction, 1098, 97, bidder);
+        auctionServer.reportPrice(auction2, 521, 22, bidder);
+        this.verifySateOfAuction(WINNING, auction);
+        this.verifySateOfAuction(WINNING, auction2);
+
+        auctionServer.announceClosed(auction);
+        auctionServer.announceClosed(auction2);
+
+        this.verifySateOfAuction(WON, auction);
+        this.verifySateOfAuction(WON, auction2);
     }
 
     public void startBiddingOnAuctionWithBidder(String auction, String bidder) throws Exception {
@@ -122,6 +148,20 @@ class AuctionSniperEndToEndTest {
                         "auction": "%s"
                         }
                         """.formatted(bidder, auction)));
+    }
+
+    public void startBiddingOnAuctionsWithBidder(List<String> auctions, String bidder) throws Exception {
+        List<String> auctionStrings = auctions.stream().map(auction -> "\"" + auction + "\"").toList();
+        this.mockMvc.perform(post("/api/auction/sniper/")
+                .contentType("application/json")
+                .content("""
+                        {
+                        "bidder": "%s",
+                        "auctions": [
+                        %s
+                        ]
+                        }
+                        """.formatted(bidder, String.join(",", auctionStrings))));
     }
 
     public void verifySateOfAuction(AuctionState expectedState, String auction) {

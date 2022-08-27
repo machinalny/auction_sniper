@@ -4,12 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.machinalny.kafka.AuctionKafkaProducer;
 import com.machinalny.model.*;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
+@Slf4j
 public class AuctionSniper {
 
     private final AuctionKafkaProducer auctionKafkaProducer;
@@ -21,15 +24,33 @@ public class AuctionSniper {
     }
 
     public void startBiddingIn(BidRequest bidRequest) throws JsonProcessingException {
-        auctionKafkaProducer.send(bidRequest.getAuction(), AuctionRecord.builder()
-                .bidder(bidRequest.getBidder())
+        if (isMultipleAuctionBidRequest(bidRequest)) {
+            bidRequest.getAuctions().forEach(auction -> {
+                try {
+                    this.joinAuctionWithBidder(auction, bidRequest.getBidder());
+                } catch (JsonProcessingException e) {
+                    log.warn("Unable to join {} with {}", auction, bidRequest.getBidder());
+                }
+            });
+        } else {
+            this.joinAuctionWithBidder(bidRequest.getAuction(), bidRequest.getBidder());
+        }
+    }
+
+    private void joinAuctionWithBidder(String auction, String bidder) throws JsonProcessingException {
+        auctionKafkaProducer.send(auction, AuctionRecord.builder()
+                .bidder(bidder)
                 .messageType(AuctionMessageType.JOIN)
                 .build());
-        currentAuctions.put(bidRequest.getAuction(),
+        currentAuctions.put(auction,
                 AuctionReport.builder()
-                        .bidder(bidRequest.getBidder())
+                        .bidder(bidder)
                         .state(AuctionState.WAITING_TO_JOIN)
                         .build());
+    }
+
+    private boolean isMultipleAuctionBidRequest(BidRequest bidRequest) {
+        return Objects.nonNull(bidRequest.getAuctions());
     }
 
     public void updateAuction(String auction, AuctionRecord auctionRecord) {
@@ -43,7 +64,8 @@ public class AuctionSniper {
     }
 
     private boolean isAuctionRecordProcessable(AuctionRecord auctionRecord) {
-        return !auctionRecord.getMessageType().equals(AuctionMessageType.BID);
+        return !auctionRecord.getMessageType().equals(AuctionMessageType.BID)
+                && !auctionRecord.getMessageType().equals(AuctionMessageType.JOIN);
     }
 
     @SneakyThrows
