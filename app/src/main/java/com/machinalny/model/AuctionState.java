@@ -2,9 +2,9 @@ package com.machinalny.model;
 
 public enum AuctionState {
     WINNING,
-    JOINED,
-    WAITING_TO_JOIN,
+    JOINING,
     BIDDING,
     LOST,
+    LOSING,
     WON;
 }

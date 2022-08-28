@@ -15,7 +15,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.machinalny.model.AuctionState.*;
 import static org.awaitility.Awaitility.await;
@@ -139,6 +138,29 @@ class AuctionSniperEndToEndTest {
         this.verifySateOfAuction(WON, auction2);
     }
 
+    @Test
+    void sniperLosesAnAuctionWhenThePriceIsTooHigh() throws Exception {
+        String auction = "losesWhenPriceIsTooHigh";
+
+        auctionServer.startSellingItem(auction);
+        this.startBiddingWithStopPriceOnAuctionWithBidder(auction, 1100, bidder);
+        auctionServer.hasReceivedJoinRequestFrom(auction, bidder);
+        auctionServer.reportPrice(auction, 1000, 98, "other Bidder");
+        this.verifySateOfAuction(BIDDING, auction);
+
+        auctionServer.hasReceivedBid(auction, 1098, bidder);
+
+        auctionServer.reportPrice(auction, 1197, 10, "third party");
+        this.verifyIsLosing(auction, 1197, 1098);
+
+        auctionServer.reportPrice(auction, 1207, 10, "fourth party");
+        this.verifyIsLosing(auction, 1207, 1098);
+
+        auctionServer.announceClosed(auction);
+        this.verifySateOfAuction(LOST, auction);
+
+    }
+
     public void startBiddingOnAuctionWithBidder(String auction, String bidder) throws Exception {
         this.mockMvc.perform(post("/api/auction/sniper/")
                 .contentType("application/json")
@@ -148,6 +170,18 @@ class AuctionSniperEndToEndTest {
                         "auction": "%s"
                         }
                         """.formatted(bidder, auction)));
+    }
+
+    public void startBiddingWithStopPriceOnAuctionWithBidder(String auction, Integer stopPrice, String bidder) throws Exception {
+        this.mockMvc.perform(post("/api/auction/sniper/")
+                .contentType("application/json")
+                .content("""
+                        {
+                        "bidder": "%s",
+                        "stopPrice": %s,
+                        "auction": "%s"
+                        }
+                        """.formatted(bidder, stopPrice, auction)));
     }
 
     public void startBiddingOnAuctionsWithBidder(List<String> auctions, String bidder) throws Exception {
@@ -170,6 +204,17 @@ class AuctionSniperEndToEndTest {
                         this.mockMvc.perform(get("/api/auction/sniper/" + auction))
                                 .andExpect(status().is2xxSuccessful())
                                 .andExpect(jsonPath("$.state").value(expectedState.toString())));
+    }
+
+    public void verifyIsLosing(String auction, Integer price, Integer lastBid) {
+        await().atMost(Duration.ofSeconds(20))
+                .pollInterval(Duration.ofSeconds(3)).untilAsserted(() ->
+                        this.mockMvc.perform(get("/api/auction/sniper/" + auction))
+                                .andExpect(status().is2xxSuccessful())
+                                .andExpect(jsonPath("$.state").value(LOSING.toString()))
+                                .andExpect(jsonPath("$.lastBid").value(lastBid))
+                                .andExpect(jsonPath("$.price").value(price))
+                );
     }
 
 }

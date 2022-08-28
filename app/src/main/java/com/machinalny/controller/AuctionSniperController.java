@@ -1,7 +1,7 @@
 package com.machinalny.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.machinalny.model.AuctionReport;
+import com.machinalny.model.Auction;
 import com.machinalny.model.BidRequest;
 import com.machinalny.service.AuctionSniper;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +19,7 @@ public class AuctionSniperController {
     }
 
     @GetMapping("/{itemIdentification}")
-    public ResponseEntity<AuctionReport> getAuctionStatusByItemIdentification(@PathVariable("itemIdentification") String itemIdentification)  {
+    public ResponseEntity<Auction> getAuctionStatusByItemIdentification(@PathVariable("itemIdentification") String itemIdentification)  {
 
         return ResponseEntity.ok(auctionSniper.getAuctionStatusBy(itemIdentification));
 

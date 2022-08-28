@@ -16,7 +16,7 @@ import java.util.Objects;
 public class AuctionSniper {
 
     private final AuctionKafkaProducer auctionKafkaProducer;
-    private final Map<String, AuctionReport> currentAuctions;
+    private final Map<String, Auction> currentAuctions;
 
     public AuctionSniper(AuctionKafkaProducer auctionKafkaProducer) {
         this.auctionKafkaProducer = auctionKafkaProducer;
@@ -27,25 +27,26 @@ public class AuctionSniper {
         if (isMultipleAuctionBidRequest(bidRequest)) {
             bidRequest.getAuctions().forEach(auction -> {
                 try {
-                    this.joinAuctionWithBidder(auction, bidRequest.getBidder());
+                    this.joinAuctionWithBidder(auction, bidRequest.getBidder(), bidRequest.getStopPrice());
                 } catch (JsonProcessingException e) {
                     log.warn("Unable to join {} with {}", auction, bidRequest.getBidder());
                 }
             });
         } else {
-            this.joinAuctionWithBidder(bidRequest.getAuction(), bidRequest.getBidder());
+            this.joinAuctionWithBidder(bidRequest.getAuction(), bidRequest.getBidder(), bidRequest.getStopPrice());
         }
     }
 
-    private void joinAuctionWithBidder(String auction, String bidder) throws JsonProcessingException {
+    private void joinAuctionWithBidder(String auction, String bidder, Integer stopPrice) throws JsonProcessingException {
         auctionKafkaProducer.send(auction, AuctionRecord.builder()
                 .bidder(bidder)
                 .messageType(AuctionMessageType.JOIN)
                 .build());
         currentAuctions.put(auction,
-                AuctionReport.builder()
+                Auction.builder()
                         .bidder(bidder)
-                        .state(AuctionState.WAITING_TO_JOIN)
+                        .stopPrice(stopPrice)
+                        .state(AuctionState.JOINING)
                         .build());
     }
 
@@ -54,8 +55,8 @@ public class AuctionSniper {
     }
 
     public void updateAuction(String auction, AuctionRecord auctionRecord) {
-        AuctionReport auctionReport = currentAuctions.getOrDefault(auction, AuctionReport.NO_REPORT);
-        if (!auctionReport.equals(AuctionReport.NO_REPORT) && isAuctionRecordProcessable(auctionRecord))
+        Auction auctionReport = currentAuctions.getOrDefault(auction, Auction.NO_REPORT);
+        if (!auctionReport.equals(Auction.NO_REPORT) && isAuctionRecordProcessable(auctionRecord))
             switch (auctionRecord.getMessageType()) {
                 case PRICE -> this.decideOnPriceMessage(auction, auctionRecord, auctionReport);
                 case CLOSED -> this.closeAuction(auctionReport);
@@ -69,11 +70,18 @@ public class AuctionSniper {
     }
 
     @SneakyThrows
-    private void decideOnPriceMessage(String auction, AuctionRecord auctionRecord, AuctionReport auctionReport) {
+    private void decideOnPriceMessage(String auction, AuctionRecord auctionRecord, Auction auctionReport) {
         if (!auctionReport.getBidder().equals(auctionRecord.getBidder())) {
-            this.bidOnAuction(auction, auctionReport.getBidder(), auctionRecord);
-            auctionReport.setState(AuctionState.BIDDING);
+            int bid = auctionRecord.getPrice() + auctionRecord.getIncrement();
+            if (auctionReport.allowsBid(bid)) {
+                this.bidOnAuction(auction, auctionReport.getBidder(), bid);
+                auctionReport.setState(AuctionState.BIDDING);
+                auctionReport.setLastBid(bid);
+            } else {
+                auctionReport.setState(AuctionState.LOSING);
+            }
             auctionReport.setPrice(auctionRecord.getPrice());
+
         } else {
             auctionReport.setState(AuctionState.WINNING);
             auctionReport.setPrice(auctionRecord.getPrice());
@@ -81,24 +89,24 @@ public class AuctionSniper {
 
     }
 
-    private void closeAuction(AuctionReport auctionReport) {
-        if (auctionReport.getState().equals(AuctionState.WINNING)) {
-            auctionReport.setState(AuctionState.WON);
+    private void closeAuction(Auction auction) {
+        if (auction.getState().equals(AuctionState.WINNING)) {
+            auction.setState(AuctionState.WON);
         } else {
-            auctionReport.setState(AuctionState.LOST);
+            auction.setState(AuctionState.LOST);
         }
 
     }
 
-    private void bidOnAuction(String auction, String bidder, AuctionRecord auctionRecord) throws JsonProcessingException {
+    private void bidOnAuction(String auction, String bidder, Integer bid) throws JsonProcessingException {
         auctionKafkaProducer.send(auction, AuctionRecord.builder()
                 .bidder(bidder)
                 .messageType(AuctionMessageType.BID)
-                .bid(auctionRecord.getPrice() + auctionRecord.getIncrement())
+                .bid(bid)
                 .build());
     }
 
-    public AuctionReport getAuctionStatusBy(String itemIdentification) {
+    public Auction getAuctionStatusBy(String itemIdentification) {
         return currentAuctions.get(itemIdentification);
     }
 }
