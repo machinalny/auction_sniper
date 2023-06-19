@@ -19,7 +19,6 @@ jobs:
         with:
           java-version: 17
           distribution: temurin
-          cache: gradle
 
       - name: Run snapshot action
         uses: mikepenz/gradle-dependency-submission@v0.8.6
