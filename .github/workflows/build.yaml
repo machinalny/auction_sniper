@@ -19,6 +19,10 @@ jobs:
         with:
           java-version: 17
           distribution: temurin
+          cache: "gradle"
+
+      - name: Verify
+        run: ./gradlew clean build --no-daemon
 
       - name: Run snapshot action
         uses: mikepenz/gradle-dependency-submission@v0.8.6
@@ -28,6 +32,3 @@ jobs:
             :app
           gradle-build-configuration: |-
             compileClasspath
-
-      - name: Verify
-        run: ./gradlew clean build
