@@ -20,8 +20,13 @@ dependencies {
     // This dependency is used by the application.
     compileOnly 'org.projectlombok:lombok:1.18.28'
     annotationProcessor 'org.projectlombok:lombok:1.18.28'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.kafka:spring-kafka'
+    implementation ('org.springframework.boot:spring-boot-starter-web') {
+        exclude group: 'org.yaml', module: 'snakeyaml'
+    }
+    implementation ('org.springframework.kafka:spring-kafka') {
+        exclude group: 'org.yaml', module: 'snakeyaml'
+    }
+    implementation 'org.yaml:snakeyaml:2.0'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'org.awaitility:awaitility:4.2.0'
